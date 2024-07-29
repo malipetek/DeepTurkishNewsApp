@@ -1,4 +1,4 @@
-FROM node:20.16.0-alpine3.20
+FROM node:20.16.0-alpine3.20 AS builder
 
 ARG VITE_DIRECTUS_URL=${VITE_DIRECTUS_URL}
 ENV VITE_DIRECTUS_URL=${VITE_DIRECTUS_URL}
@@ -8,18 +8,17 @@ ARG PUBLIC_DIRECTUS_URL=${PUBLIC_DIRECTUS_URL}
 ENV PUBLIC_DIRECTUS_URL=${PUBLIC_DIRECTUS_URL}
 
 WORKDIR /app
-
-COPY package.json yarn.lock ./
-
-# Install dependencies using Yarn
-RUN yarn install --frozen-lockfile
-
+COPY package*.json .
+RUN npm ci
 COPY . .
+RUN npm run build
+RUN npm prune --production
 
-# Build the project and remove unnecessary dependencies
-RUN yarn build && yarn install --production
-
-ENV PORT 80
-EXPOSE 80
-
-# CMD ["node", "build"]
+FROM node:20.16.0-alpine3.20
+WORKDIR /app
+COPY --from=builder /app/build build/
+COPY --from=builder /app/node_modules node_modules/
+COPY package.json .
+EXPOSE 3000
+ENV NODE_ENV=production
+CMD [ "node", "build" ]
