@@ -1,35 +1,26 @@
-
-
-FROM node:20.16.0-alpine3.20 AS builder
-
-ARG VITE_DIRECTUS_URL=${VITE_DIRECTUS_URL}
-ENV VITE_DIRECTUS_URL=${VITE_DIRECTUS_URL}
-ARG DIRECTUS_STATIC_TOKEN=${DIRECTUS_STATIC_TOKEN}
-ENV DIRECTUS_STATIC_TOKEN=${DIRECTUS_STATIC_TOKEN}
-ARG PUBLIC_DIRECTUS_URL=${PUBLIC_DIRECTUS_URL}
-ENV PUBLIC_DIRECTUS_URL=${PUBLIC_DIRECTUS_URL}
-# Use an Alpine image with Node.js installed for building the SvelteKit app
+FROM node:lts-slim AS deps
 WORKDIR /app
-# Copy only package files to leverage Docker cache
-COPY package.json yarn.lock ./
-# Install dependencies using Yarn
-RUN yarn install --frozen-lockfile
-# Copy the rest of the application code
+RUN npm install -g pnpm
+COPY package*.json pnpm-lock.yaml yarn.lock ./
+RUN pnpm i --frozen-lockfile
+
+FROM node:lts-slim AS builder
+WORKDIR /app
+RUN npm install -g pnpm
 COPY . .
-# Build the application
-RUN yarn build
-# Remove development dependencies to keep the image size down
-RUN yarn autoclean --force --only="production"
+COPY --from=deps /app/node_modules ./node_modules
+RUN pnpm run build
+RUN pnpm prune --production
 
-# Start a new stage for the production environment
-FROM node:20.16.0-alpine3.20
+FROM node:lts-slim AS runner
+RUN npm install -g pnpm
 WORKDIR /app
-# Copy built assets and necessary modules from the builder stage
-COPY --from=builder /app/.svelte-kit build/
-COPY --from=builder /app/node_modules node_modules/
-# Expose port 3000 for the web server
-EXPOSE 3000
-# Set the environment variable to indicate production mode
-ENV NODE_ENV=production
-# Command to start the application
-CMD ["node", "build"]
+ENV NODE_ENV production
+ENV MODELS_HOST=localhost
+COPY --from=builder --chown=node:node /app/build build/
+COPY --from=builder --chown=node:node /app/node_modules node_modules/
+
+USER node:node
+EXPOSE 3000 4173
+
+CMD ["pnpm", "run", "preview"]
