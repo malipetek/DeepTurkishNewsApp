@@ -9,10 +9,10 @@ ENV PUBLIC_DIRECTUS_URL=${PUBLIC_DIRECTUS_URL}
 
 WORKDIR /app
 COPY package*.json .
-RUN npm ci
+RUN yarn install --frozen-lockfile
 COPY . .
-RUN npm run build
-RUN npm prune --production
+RUN yarn build
+RUN yarn --production
 
 FROM node:20.16.0-alpine3.20
 WORKDIR /app
