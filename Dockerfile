@@ -22,4 +22,4 @@ RUN yarn build && yarn install --production
 ENV PORT 80
 EXPOSE 80
 
-CMD ["node", "build"]
+CMD ["node", "app/build"]
